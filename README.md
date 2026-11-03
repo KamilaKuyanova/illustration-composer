@@ -80,6 +80,7 @@ Figma ──экспорт SVG──▶ source/S.svg, source/L.svg ──scripts
 ## ИИ-инструменты при разработке
 
 Claude Code (модель Claude Sonnet 5.5): разбор Figma-экспорта, написание кода и тестов, проверка в браузере.
+Также ChatGPT
 
 ## Примеры композиций
 
