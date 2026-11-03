@@ -10,7 +10,7 @@ export interface State {
 }
 
 export const initialState: State = {
-  comp: { items: [], scale: 0.5, format: FORMATS[0], scheme: SCHEMES[0] },
+  comp: { items: [], scale: 0.5, format: FORMATS[0], scheme: SCHEMES[0], size: 'S' },
   selected: null,
   past: [],
   future: [],

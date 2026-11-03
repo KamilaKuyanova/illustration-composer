@@ -1,4 +1,6 @@
 export type ObjState = 'main' | 'bg'
+/** Размер объектов в библиотеке: S — мелкие упрощённые, L — крупные с дополнительными деталями. */
+export type ObjSize = 'S' | 'L'
 
 /** Одно состояние объекта: исходные SVG-элементы без изменений + их рамка в координатах исходного файла. */
 export interface Variant {
@@ -14,9 +16,10 @@ export interface LibObject {
   id: string
   name: string
   tags: string[]
-  main: Variant
-  bg: Variant
+  sizes: Record<ObjSize, Record<ObjState, Variant>>
 }
+
+export const variant = (o: LibObject, size: ObjSize, state: ObjState): Variant => o.sizes[size][state]
 
 export interface Library {
   objects: LibObject[]

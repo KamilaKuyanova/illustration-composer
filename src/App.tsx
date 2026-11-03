@@ -1,15 +1,16 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { Art, Canvas } from './Canvas'
-import { FORMATS, autoCompose, exportSvg, sortByDepth, variantOf } from './lib/compose'
-import { loadLibrary, matchObjects, parseNames, type LibObject, type Library, type ObjState } from './lib/library'
+import { FORMATS, autoCompose, exportSvg, sortByDepth, switchSize, variantOf } from './lib/compose'
+import { loadLibrary, matchObjects, parseNames, type LibObject, type Library, type ObjSize, type ObjState } from './lib/library'
 import { SCHEMES, parsePalette, type Scheme } from './lib/palette'
+import { parseSvgLibrary, withObjects } from './lib/customSvg'
 import { initialState, reducer } from './state'
 import './App.css'
 
 const EXAMPLES = ['финансовая безопасность', 'идея для стартапа', 'обучение онлайн', 'командная работа над проектом']
 
-function Thumb({ obj, state, scheme }: { obj: LibObject; state: ObjState; scheme: Scheme }) {
-  const v = obj[state]
+function Thumb({ obj, state, scheme, size }: { obj: LibObject; state: ObjState; scheme: Scheme; size: ObjSize }) {
+  const v = obj.sizes[size][state]
   return (
     <svg viewBox={`${v.x} ${v.y} ${v.w} ${v.h}`} className="thumb-svg" aria-hidden>
       <Art v={v} scheme={scheme} />
@@ -32,13 +33,26 @@ export default function App() {
     loadLibrary().then(setLib, e => setError(String(e.message ?? e)))
   }, [])
 
-  // стартовая композиция, чтобы холст не был пустым
+  // Стартовая композиция, чтобы холст не был пустым. Адрес может задать её сам:
+  // ?q=метафора | ?names=телефон,лампа  &size=S|L  &scheme=violet|teal|peach  &format=og|sq|portrait|wide
   const started = useRef(false)
   useEffect(() => {
     if (!lib || started.current) return
     started.current = true
-    const pick = ['Телефон', 'Пазлы', 'Монета', 'Лампа'].map(n => lib.objects.find(o => o.name === n)!)
-    const c = autoCompose(pick, comp.format, comp.scheme, 2)
+    const q = new URLSearchParams(location.search)
+    const format = FORMATS.find(f => f.id === q.get('format')) ?? comp.format
+    const scheme = SCHEMES.find(s => s.id === q.get('scheme')) ?? comp.scheme
+    const size: ObjSize = q.get('size') === 'L' ? 'L' : 'S'
+    let objs: LibObject[] = []
+    if (q.get('q')) {
+      setMetaphor(q.get('q')!)
+      objs = matchObjects(lib, q.get('q')!).slice(0, 4).map(m => m.obj)
+    } else if (q.get('names')) {
+      setNames(q.get('names')!)
+      objs = parseNames(lib, q.get('names')!).found
+    }
+    if (!objs.length) objs = ['Телефон', 'Пазлы', 'Монета', 'Лампа'].map(n => lib.objects.find(o => o.name === n)!)
+    const c = autoCompose(objs, format, scheme, objs.length >= 4 ? 2 : Math.max(1, Math.ceil(objs.length / 2)), size)
     dispatch({ type: 'replace', comp: { ...c, items: sortByDepth(c.items) } })
   }, [lib, comp.format, comp.scheme])
 
@@ -76,7 +90,7 @@ export default function App() {
   const schemes = custom ? [...SCHEMES, custom] : SCHEMES
 
   const build = (objs: LibObject[], mains?: number) => {
-    const c = autoCompose(objs, comp.format, comp.scheme, mains)
+    const c = autoCompose(objs, comp.format, comp.scheme, mains, comp.size)
     dispatch({ type: 'replace', comp: { ...c, items: sortByDepth(c.items) } })
   }
 
@@ -115,6 +129,23 @@ export default function App() {
       setCustom(s)
       dispatch({ type: 'patch', patch: { scheme: s } })
       setNote(`Палитра «${s.name}» применена: ${s.light}, ${s.mid}, ${s.dark}.`)
+    } catch (e) {
+      setNote((e as Error).message)
+    }
+  }
+
+  const onLibrary = async (files: FileList | null) => {
+    if (!files?.length) return
+    try {
+      let next = lib
+      let added = 0
+      for (const f of files) {
+        const objs = parseSvgLibrary(await f.text(), f.name, next.objects.length)
+        next = withObjects(next, objs)
+        added += objs.length
+      }
+      setLib(next)
+      setNote(`В библиотеку добавлено объектов: ${added}. Их можно искать по названию (имя группы или файла).`)
     } catch (e) {
       setNote((e as Error).message)
     }
@@ -176,11 +207,15 @@ export default function App() {
         {note && <p className="note" role="status">{note}</p>}
 
         <section>
-          <h2>Библиотека · 10 объектов</h2>
+          <h2>Библиотека · {lib.objects.length} объектов</h2>
+          <label className="upload">
+            Загрузить свои SVG
+            <input type="file" accept=".svg,image/svg+xml" multiple onChange={e => (onLibrary(e.target.files), (e.target.value = ''))} />
+          </label>
           <div className="lib">
             {lib.objects.map(o => (
               <div className="lib-card" key={o.id} style={{ background: comp.scheme.light }}>
-                <Thumb obj={o} state="main" scheme={comp.scheme} />
+                <Thumb obj={o} state="main" scheme={comp.scheme} size={comp.size} />
                 <span>{o.name}</span>
                 <div className="lib-btns">
                   <button onClick={() => addObj(o, 'main')} title="Добавить главный объект">главный</button>
@@ -213,6 +248,12 @@ export default function App() {
               {FORMATS.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </label>
+          <label>Размер объектов
+            <select value={comp.size} onChange={e => dispatch({ type: 'patch', patch: switchSize(lib, comp, e.target.value as ObjSize) })}>
+              <option value="S">S · мелкие, упрощённые</option>
+              <option value="L">L · крупные, с деталями</option>
+            </select>
+          </label>
           <label>Цвета
             <select
               value={comp.scheme.id}
@@ -227,7 +268,7 @@ export default function App() {
           </label>
           <label className="grow">Размер композиции
             <input
-              type="range" min={0.2} max={3} step={0.01} value={comp.scale}
+              type="range" min={0.1} max={3} step={0.01} value={comp.scale}
               onPointerDown={() => dispatch({ type: 'begin' })}
               onChange={e => dispatch({ type: 'patch', patch: { scale: +e.target.value }, record: false })}
             />
@@ -246,10 +287,11 @@ export default function App() {
           <ul className="layers">
             {layers.map(it => {
               const o = lib.byId.get(it.objId)!
+              const lv = variantOf(lib, it, comp.size)
               return (
                 <li key={it.uid} className={it.uid === selected ? 'on' : ''} onClick={() => dispatch({ type: 'select', uid: it.uid })}>
-                  <svg style={{ background: comp.scheme.light }} viewBox={`${variantOf(lib, it).x} ${variantOf(lib, it).y} ${variantOf(lib, it).w} ${variantOf(lib, it).h}`}>
-                    <Art v={variantOf(lib, it)} scheme={comp.scheme} />
+                  <svg style={{ background: comp.scheme.light }} viewBox={`${lv.x} ${lv.y} ${lv.w} ${lv.h}`}>
+                    <Art v={lv} scheme={comp.scheme} />
                   </svg>
                   <span>{o.name}<small>{it.state === 'main' ? 'главный' : 'фоновый'}</small></span>
                 </li>

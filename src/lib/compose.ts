@@ -1,5 +1,5 @@
 import { recolor, type Scheme } from './palette'
-import type { LibObject, Library, ObjState, Variant } from './library'
+import { variant, type LibObject, type Library, type ObjSize, type ObjState, type Variant } from './library'
 
 export interface Format {
   id: string
@@ -31,13 +31,18 @@ export interface Composition {
   scale: number
   format: Format
   scheme: Scheme
+  /** S — мелкие упрощённые объекты, L — крупные с деталями. */
+  size: ObjSize
 }
+
+/** Во сколько раз объекты размера L крупнее на кадре, чем S, при автосборке. */
+export const L_VISUAL_FACTOR = 1.5
 
 let counter = 0
 export const newUid = () => `i${Date.now().toString(36)}${(counter++).toString(36)}`
 
-export const variantOf = (lib: Library, it: Pick<Item, 'objId' | 'state'>): Variant =>
-  lib.byId.get(it.objId)![it.state]
+export const variantOf = (lib: Library, it: Pick<Item, 'objId' | 'state'>, size: ObjSize): Variant =>
+  variant(lib.byId.get(it.objId)!, size, it.state)
 
 export const itemTransform = (it: Item, v: Variant, scale: number) =>
   `translate(${r(it.x)} ${r(it.y)}) rotate(${r(it.rot)}) scale(${r(scale, 4)}) translate(${r(-(v.x + v.w / 2))} ${r(-(v.y + v.h / 2))})`
@@ -61,6 +66,7 @@ export function autoCompose(
   format: Format,
   scheme: Scheme,
   mains = Math.max(1, Math.ceil(objs.length / 2)),
+  size: ObjSize = 'S',
 ): Composition {
   const n = objs.length
   const landscape = format.w >= format.h
@@ -70,12 +76,14 @@ export function autoCompose(
 
   // общий масштаб: ряды целиком должны поместиться в кадр с полями и зазорами
   const gap = format.w * 0.03
-  const fill = 0.9
-  const sumW = rowObjs.map(r => r.reduce((a, o) => a + o.main.w, 0))
-  const maxH = rowObjs.map(r => Math.max(...r.map(o => o.main.h)))
+  // S — мелкие объекты с воздухом вокруг, L — крупные, почти на весь кадр
+  const fill = size === 'S' ? 0.62 : 0.92
+  const dim = (o: LibObject) => variant(o, size, 'main')
+  const sumW = rowObjs.map(r => r.reduce((a, o) => a + dim(o).w, 0))
+  const maxH = rowObjs.map(r => Math.max(...r.map(o => dim(o).h)))
   let scale = ((format.h * fill - gap * (rowObjs.length - 1)) / maxH.reduce((a, b) => a + b, 0))
   rowObjs.forEach((r, i) => (scale = Math.min(scale, (format.w * fill - gap * (r.length - 1)) / sumW[i])))
-  scale = Math.min(scale, 1.6)
+  scale = Math.min(scale, 3)
 
   const totalH = maxH.reduce((a, b) => a + b * scale, 0) + gap * (rowObjs.length - 1)
   let y = (format.h - totalH) / 2
@@ -90,15 +98,15 @@ export function autoCompose(
         uid: newUid(),
         objId: o.id,
         state: idx < mains ? 'main' : 'bg',
-        x: x + (o.main.w * scale) / 2,
+        x: x + (dim(o).w * scale) / 2,
         y: y + rowH / 2,
         rot: 0,
       })
-      x += o.main.w * scale + gap
+      x += dim(o).w * scale + gap
     }
     y += rowH + gap
   })
-  return { items, scale, format, scheme }
+  return { items, scale, format, scheme, size }
 }
 
 /** Главные объекты поверх фоновых, как в образцах. */
@@ -113,11 +121,11 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').repl
  * внутри — исходные path без изменений (кроме перекраски по схеме).
  */
 export function exportSvg(lib: Library, comp: Composition): string {
-  const { format, scheme, scale } = comp
+  const { format, scheme, scale, size } = comp
   const groups = comp.items
     .map((it, i) => {
       const obj = lib.byId.get(it.objId)!
-      const v = obj[it.state]
+      const v = variant(obj, size, it.state)
       return (
         `<g id="${esc(obj.name)}-${i + 1}" data-name="${esc(obj.name)}" data-state="${it.state === 'main' ? 'главный' : 'фоновый'}" ` +
         `transform="${itemTransform(it, v, scale)}">${recolor(v.svg, scheme)}</g>`
@@ -128,4 +136,16 @@ export function exportSvg(lib: Library, comp: Composition): string {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${format.w}" height="${format.h}" viewBox="0 0 ${format.w} ${format.h}" fill="none">\n` +
     `<rect id="background" width="${format.w}" height="${format.h}" fill="${scheme.light}"/>\n${groups}\n</svg>\n`
   )
+}
+
+/**
+ * Смена размера объектов S↔L: объекты L нативно крупнее, поэтому масштаб пересчитывается так,
+ * чтобы на кадре они стали в L_VISUAL_FACTOR раз крупнее (и наоборот при возврате к S).
+ */
+export function switchSize(lib: Library, comp: Composition, size: ObjSize): Pick<Composition, 'size' | 'scale'> {
+  if (size === comp.size) return { size, scale: comp.scale }
+  const ws = (sz: ObjSize) => comp.items.reduce((a, it) => a + variantOf(lib, it, sz).w, 0) || 1
+  const native = ws(comp.size) / ws(size) // во сколько раз надо изменить масштаб, чтобы визуальный размер не изменился
+  const factor = size === 'L' ? L_VISUAL_FACTOR : 1 / L_VISUAL_FACTOR
+  return { size, scale: comp.scale * native * factor }
 }

@@ -20,7 +20,7 @@ interface Props {
 
 export function Canvas({ lib, comp, selected, dispatch, svgRef }: Props) {
   const drag = useRef<{ uid: string; dx: number; dy: number } | null>(null)
-  const { format, scheme, scale } = comp
+  const { format, scheme, scale, size } = comp
 
   const toFrame = (e: React.PointerEvent) => {
     const svg = svgRef.current!
@@ -59,7 +59,7 @@ export function Canvas({ lib, comp, selected, dispatch, svgRef }: Props) {
     >
       <rect width={format.w} height={format.h} fill={scheme.light} />
       {comp.items.map(it => {
-        const v = variantOf(lib, it)
+        const v = variantOf(lib, it, size)
         const sel = it.uid === selected
         return (
           <g

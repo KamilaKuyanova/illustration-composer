@@ -8,14 +8,14 @@ const objects = JSON.parse(fs.readFileSync('public/library.json', 'utf8')).objec
 const lib: Library = { objects, byId: new Map(objects.map(o => [o.id, o])) }
 
 const jobs = [
-  { file: 'finansovaya-bezopasnost', query: 'финансовая безопасность', format: 'og', scheme: 'violet' },
-  { file: 'ideya-dlya-startapa', query: 'идея для стартапа', format: 'sq', scheme: 'peach' },
-  { file: 'obuchenie-onlayn', query: 'обучение онлайн', format: 'wide', scheme: 'teal' },
+  { file: 'finansovaya-bezopasnost', query: 'финансовая безопасность', format: 'og', scheme: 'violet', size: 'S' as const },
+  { file: 'ideya-dlya-startapa', query: 'идея для стартапа', format: 'sq', scheme: 'peach', size: 'L' as const },
+  { file: 'obuchenie-onlayn', query: 'обучение онлайн', format: 'wide', scheme: 'teal', size: 'S' as const },
 ]
 fs.mkdirSync('examples', { recursive: true })
 for (const j of jobs) {
   const top = matchObjects(lib, j.query).slice(0, 4)
-  const c = autoCompose(top.map(m => m.obj), FORMATS.find(f => f.id === j.format)!, SCHEMES.find(s => s.id === j.scheme)!, top.length >= 4 ? 2 : 1)
+  const c = autoCompose(top.map(m => m.obj), FORMATS.find(f => f.id === j.format)!, SCHEMES.find(s => s.id === j.scheme)!, top.length >= 4 ? 2 : 1, j.size)
   fs.writeFileSync(`examples/${j.file}.svg`, exportSvg(lib, { ...c, items: sortByDepth(c.items) }))
   console.log(j.file, '←', top.map(m => m.obj.name).join(', '))
 }
