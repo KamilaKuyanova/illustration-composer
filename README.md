@@ -14,7 +14,7 @@ npm run dev        # http://127.0.0.1:5173
 npm test           # тесты логики
 npm run build      # продакшн-сборка в dist/ (пути относительные, подходит для любого хостинга)
 npm run extract    # пересобрать public/library.json из source/*.svg
-npm run examples   # пересобрать примеры композиций в examples/
+npm run examples   # пересобрать примеры композиций (SVG и PNG) в examples/
 ```
 
 Композицию можно задать адресом, это удобно для демонстраций:
@@ -84,9 +84,22 @@ Claude Code (модель Claude Sonnet 5.5): разбор Figma-экспорт�
 
 ## Примеры композиций
 
-См. [examples/](examples), у каждого есть SVG и PNG-превью:
-- `finansovaya-bezopasnost` (1200×630, фиолетовая, размер S);
-- `ideya-dlya-startapa` (1080×1080, персиковая, размер L);
-- `obuchenie-onlayn` (1920×1080, бирюзовая, размер S).
+Собраны тем же кодом, что и приложение (`npm run examples`): у каждого есть SVG и PNG-превью в [examples/](examples).
+
+| Композиция | Метафора | Формат | Схема | Размер |
+| --- | --- | --- | --- | --- |
+| `finansovaya-bezopasnost` | финансовая безопасность | 1200×630 | фиолетовая | S |
+| `ideya-dlya-startapa` | идея для стартапа | 1080×1080 | персиковая | L |
+| `obuchenie-onlayn` | обучение онлайн | 1920×1080 | бирюзовая | S |
+| `komandnaya-rabota` | командная работа над проектом | 1080×1350 | фиолетовая | L |
+| `tvorchestvo-i-muzyka` | творчество и музыка | 1200×630 | персиковая | S |
+
+![Финансовая безопасность](examples/finansovaya-bezopasnost.png)
 
 ![Идея для стартапа](examples/ideya-dlya-startapa.png)
+
+![Обучение онлайн](examples/obuchenie-onlayn.png)
+
+![Командная работа над проектом](examples/komandnaya-rabota.png)
+
+![Творчество и музыка](examples/tvorchestvo-i-muzyka.png)
