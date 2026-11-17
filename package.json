@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "tsx --test tests/*.test.ts",
     "examples": "tsx scripts/examples.ts",
-    "extract": "node scripts/extract.mjs"
+    "extract": "node scripts/extract.mjs",
+    "doc": "node scripts/make-doc.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -22,6 +23,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "docx": "^9.15.4",
     "oxlint": "^1.89.0",
     "svg-path-bbox": "^2.1.0",
     "tsx": "^4.23.15",
